@@ -28,62 +28,56 @@ dataRootDir = "/cofast/fmasson/ECMWF_SEAICE/"
 diagnostics = ["extent", "area"]
 nd = len(diagnostics)
 
-# Definition of regions [list of lists each containing a name, and a list of coordinates defining the boundaries]
+# 2. Definition of regions [list of lists each containing a name, and a list of coordinates defining the boundaries]
               # Name              lonW        lonE    latS    latN
 regions = [[  "Arctic",           [-180.0,    180.0,  0.0,    90.0]], \
            [  "Antarctic",        [-180.0,    180.0,  -90.0,  90.0]], \
           ]
-
 nr = len(regions)
 
-# Months of initialization [list of strings]
+# 3. Months of initialization [list of strings]
 monthsInit = [str(m).zfill(2) for m in [2, 5, 8, 11]]
 nm = len(monthsInit)
 
-# Years of initialization [list of strings]
+# 4. Years of initialization [list of strings]
 yearsInit = [str(y) for y in np.arange(1993, 2022 + 1)]
 ny = len(yearsInit)
 
-# The ensemble members to be selected [list of strings]
+# 5. The ensemble members to be selected [list of strings]
 members = [str(j) for j in np.arange(50 + 1)]
 nb = len(members)
 
+# 6. The lead times (in months from initialization)
+leadTimes = [0, 1, 2, 3, 4, 5]
+nl = len(leadTimes)
 
 
+# Phase 1: producing the diagnostics
 
-
-
-# We start looping over months of initialization
+# For each of the diagnostics, we start looping over months of initialization
 # We set a boolean variable to "True" to create grid cell areas only once
 
 createCellArea = True
 createMasks    = True
-createData     = True
+createDataArray= True
 
 
-# Our goal here is to create an array called "forecasts" that has the following dimensions:
-
-# 1st dimension: the *d*iagnostic
-# 2nd dimension: the *r*egion
-# 3rd dimension: the *m*onth of initialization
-# 4th dimension: the *y*ear of initialization
-# 5th dimension: the mem*b*er
-# 6th dimension: the *l*ead time
+# Our goal here is to create an array called "forecasts" of dimensions nd, nr, nm, ny, nb, nl
 
 # Each dimension has a running index called j${letter} where $letter is d, r, m, y, b, l following the dimensions above
+# The order of the loops should be organized to avoid opening and closing the same file many times. The files are organized
+# as one file =  one member for one year+month initial time seas5_ens_26_sic_20050801.nc. The region, lead time should therefore
+# arrive as last loops
 
-for jd in range(nd)
-
-for jmI, monthInit in enumerate(monthsInit):
-    # Then we loop over the years of initialization for a given month of initializatio
-    for jyI, yearInit in enumerate(yearsInit):
+for jm, monthInit in enumerate(monthsInit):
+    # Then we loop over the years of initialization for a given month of initialization
+    for jy, yearInit in enumerate(yearsInit):
         # Then we loop over the ensemble members
-        for jmb, member in enumerate(members):
+        for jb, member in enumerate(members):
             fileName = "seas5_ens_" + member + "_sic_" + yearInit + monthInit + "01" + ".nc"
             fileIn = dataRootDir + fileName
 
             try:
-
                 print("Reading file " + fileIn)
                 f = Dataset(fileIn, mode = "r")
                 sic = f.variables["sic"][:] * 100.0 # Convert to %
@@ -92,15 +86,17 @@ for jmI, monthInit in enumerate(monthsInit):
                 f.close()
 
                 if createCellArea:
+                    print("Creating cell area")
+
                     if len(set(np.diff(lon))) != 1 or len(set(np.diff(lat))) != 1:
-                                # If the spacing is not regular
+                            # If the spacing is not regular
                         stop("Spacing not regular")
                     else:
                         dLon = np.min(np.diff(lon))
                         dLat = np.min(np.diff(lat)) # min or max does not
-                                                    # since all equal
+                                                # since all equal
 
-                        # Reset lon to [-180.0, 180.0]
+                        # Reset lon to [-180.0, 180.0] to follow the region mask conventions
                         lon[lon > 180.0] = lon[lon > 180.0] - 360.0
 
                         # mesh lon and lat from 1D to 2D
@@ -111,11 +107,11 @@ for jmI, monthInit in enumerate(monthsInit):
                                 REarth * dLat / 360.0 * 2 * np.pi
 
                         createCellArea = False
-        
+    
                 if createMasks:
                     # Create masks of 0's and 1 corresponding to the masks
-                    for jms, mask in enumerate(masks):
-                        lonW, lonE, latS, latN = mask[1][0], mask[1][1], mask[1][2], mask[1][3]
+                    for jr, region in enumerate(regions):
+                        lonW, lonE, latS, latN = region[1][0], region[1][1], region[1][2], region[1][3]
 
                         # Two cases depending on whether the region straddles the 180° meridian
                         if lonW < lonE:
@@ -123,35 +119,40 @@ for jmI, monthInit in enumerate(monthsInit):
                         else:
                             maskValue = ((LON >= lonW) + (LON <= lonE)) * (LAT >= latS) * (LAT <= latN) * 1 
 
-                        masks[jms].append(maskValue)
-                    
+                        # Update the regions variable with the mask
+                        regions[jr].append(maskValue)
+                
                     createMasks = False
 
 
                 # Loop over masks
-                for jms, mask in enumerate(masks):
+                for jr, region in enumerate(regions):
                     # Compute the sea ice area and sea ice extents
-                    sia = compute_area(sic, cellArea, mask = mask[2])
-                    sie = compute_extent(sic, cellArea, mask = mask[2])
+                    sia = compute_area(  sic, cellArea, mask = region[2])
+                    sie = compute_extent(sic, cellArea, mask = region[2])
 
 
                     # Save that in an array that has as dimensions:
                     # 1) diagnostic (extent then area) 
-                    # 2) regions (masks)
+                    # 2) regions (defined by their masks)
                     # 3) month of initialization
                     # 4) year of initialization
                     # 5) ensemble member
-                    # 6) time
+                    # 6) lead time
 
-                    if createData:
-                        data = np.full((nDiags, nMasks, nMonthsInit, nYearsInit, nMembers, nTime), np.nan)
-                        createData = False
+                    if createDataArray:
+                        forecastData = np.full((nd, nr, nm, ny, nb, nl), np.nan)
+                        createDataArray = False
 
-                    data[0, jms, jmI, jyI, jmb, :] = sie
-                    data[1, jms, jmI, jyI, jmb, :] = sie
+                    # Run through the diagnostics
+                    for jd in range(nd):
+                        if diagnostics[jd] == "extent":
+                            forecastData[jd, jr, jm, jy, jb, :] = sie[leadTimes]
+                        elif diagnostics[jd] == "area":
+                            forecastData[jd, jr, jm, jy, jb, :] = sia[leadTimes]
 
 
-                
+            
                 # Plot the raw data
                 # One figure per region and per month of initialization
 
