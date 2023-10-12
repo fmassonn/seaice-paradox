@@ -1,11 +1,13 @@
 import numpy as np
 from netCDF4 import Dataset
+import matplotlib.pyplot as plt
+
 
 # functions to compute sea ice area/extent
 from seaice_commondiags import * 
 
 REarth = 6356e3 # Earth'radius in meters, to compute grid cell areas
-
+monthsNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 # Our goal in this script is first to create an array called "forecasts" that will record several diagnostics out of the native
 # sea ice data provided by ECMWF. The array will have the following dimensions:
 
@@ -25,7 +27,8 @@ REarth = 6356e3 # Earth'radius in meters, to compute grid cell areas
 dataRootDir = "/cofast/fmasson/ECMWF_SEAICE/"
 
 # 1. Definition of diagnostics Sea ice extent and sea ice area, others can be added depending on how many diagnostics are calculated in the loop below (if so, update this integer)
-diagnostics = ["extent", "area"]
+diagnostics = ["extent",]# "area"]
+unitsDiagnostics = ["10$^6$ km$^2$",]# "10$^6$ km$^2$"]
 nd = len(diagnostics)
 
 # 2. Definition of regions [list of lists each containing a name, and a list of coordinates defining the boundaries]
@@ -36,11 +39,12 @@ regions = [[  "Arctic",           [-180.0,    180.0,  0.0,    90.0]], \
 nr = len(regions)
 
 # 3. Months of initialization [list of strings]
-monthsInit = [str(m).zfill(2) for m in [2, 5, 8, 11]]
+monthsInit = [5, 11]#[2, 5, 8, 11] #! NON-Pythonic: 1 = January.
 nm = len(monthsInit)
 
 # 4. Years of initialization [list of strings]
-yearsInit = [str(y) for y in np.arange(1993, 2022 + 1)]
+yearsInit = np.arange(1993, 2022 + 1)
+#yearsInit = np.arange(1993, 1995 + 1)
 ny = len(yearsInit)
 
 # 5. The ensemble members to be selected [list of strings]
@@ -48,7 +52,7 @@ members = [str(j) for j in np.arange(50 + 1)]
 nb = len(members)
 
 # 6. The lead times (in months from initialization)
-leadTimes = [0, 1, 2, 3, 4, 5]
+leadTimes = [4]#[0, 1, 2, 3, 4, 5, 6]
 nl = len(leadTimes)
 
 
@@ -74,7 +78,7 @@ for jm, monthInit in enumerate(monthsInit):
     for jy, yearInit in enumerate(yearsInit):
         # Then we loop over the ensemble members
         for jb, member in enumerate(members):
-            fileName = "seas5_ens_" + member + "_sic_" + yearInit + monthInit + "01" + ".nc"
+            fileName = "seas5_ens_" + member + "_sic_" + str(yearInit) + str(monthInit).zfill(2) + "01" + ".nc"
             fileIn = dataRootDir + fileName
 
             try:
@@ -158,4 +162,37 @@ for jm, monthInit in enumerate(monthsInit):
 
             except FileNotFoundError:
                 print("File not found: " + fileIn)
+
+# Make statistics
+# This array has dimensions nd, nr, nm, ny, nl
+forecastDataEnsembleMean = np.mean(forecastData, axis = 4)
+
+# Make figures to check that everything. One figure per region, per lead time, per initialization month, and per diagnostic
+
+for jr in range(nr):
+    regionNoSpace = regions[jr][0].replace(" ", "")
+    for jm in range(nm):
+        for jd in range(nd):
+            for jl in range(nl):
+                fig, ax = plt.subplots(1, 1, figsize = (6, 3))
+                labelFlag = True
+                for jb in range(nb):
+                    if labelFlag:
+                        label = "Members"
+                        labelFlag = False
+                    else:
+                        label = None
+                    ax.scatter(yearsInit, forecastData[jd, jr, jm, :, jb, jl], 5, color  = [0.3, 0.3, 0.3], label = label)
+                # Ensemble mean
+                ax.scatter(yearsInit + 0.1, forecastDataEnsembleMean[jd, jr, jm, :, jl], 30, color = [1, 0.5, 0], label = "Ensemble mean")
+                ax.grid()
+                ax.legend()
+                ax.set_ylabel(unitsDiagnostics[jd])
+                ax.set_axisbelow(True)
+                ax.set_title(regions[jr][0] + " sea ice " + diagnostics[jd] + "\n" + "seas 5 - " + monthsNames[monthsInit[jm] - 1] + " initialization - " + monthsNames[(monthsInit[jm] + leadTimes[jl]) % 12 - 1] + " target") 
+                figName = "seas5_" + str(yearsInit[0]) + "-" + str(yearsInit[-1]) + "_" + diagnostics[jd] + "_m" + str(monthsInit[jm]).zfill(2) + "_t" + str((monthsInit[jm] + leadTimes[jl])).zfill(2) + "_" + regions[jr][0] + ".png"
+                fig.tight_layout()
+                plt.savefig("./figs/" + figName)
+                print(figName + "  printed")
+                plt.close(fig)
 
