@@ -6,39 +6,73 @@ from seaice_commondiags import *
 
 REarth = 6356e3 # Earth'radius in meters, to compute grid cell areas
 
+# Our goal in this script is first to create an array called "forecasts" that will record several diagnostics out of the native
+# sea ice data provided by ECMWF. The array will have the following dimensions:
+
+# 1st dimension: the *d*iagnostic (e.g., extent, area of sea ice)
+# 2nd dimension: the *r*egion (e.g., Arctic, Ross Sea, ...)     
+# 3rd dimension: the *m*onth of initialization (e.g., Jan, Feb, ...)
+# 4th dimension: the *y*ear of initialization (e.g., 1993, 1994, ...)
+# 5th dimension: the mem*b*er (e.g., 1, 2, ...)
+# 6th dimension: the *l*ead time (e.g., 1, 2, ...)
+
+# Each dimension has a corresponding running index called j${letter} where $letter is d, r, m, y, b, l following the dimensions above. Each index runs from 0 to the length of the dimension (not included, as per Python conventions)
+
 # Analysis parameters
 # -------------------
 
 # Where the source data is located [string]
 dataRootDir = "/cofast/fmasson/ECMWF_SEAICE/"
 
-# The ensemble members to be selected [list of strings]
-members = [str(j) for j in np.arange(50 + 1)]
+# 1. Definition of diagnostics Sea ice extent and sea ice area, others can be added depending on how many diagnostics are calculated in the loop below (if so, update this integer)
+diagnostics = ["extent", "area"]
+nd = len(diagnostics)
+
+# Definition of regions [list of lists each containing a name, and a list of coordinates defining the boundaries]
+              # Name              lonW        lonE    latS    latN
+regions = [[  "Arctic",           [-180.0,    180.0,  0.0,    90.0]], \
+           [  "Antarctic",        [-180.0,    180.0,  -90.0,  90.0]], \
+          ]
+
+nr = len(regions)
 
 # Months of initialization [list of strings]
 monthsInit = [str(m).zfill(2) for m in [2, 5, 8, 11]]
+nm = len(monthsInit)
 
 # Years of initialization [list of strings]
 yearsInit = [str(y) for y in np.arange(1993, 2022 + 1)]
+ny = len(yearsInit)
 
-# Definition of masks [list of lists each containing a name, and a list of coordinates defining the boundaries]
-            # Name              lonW        lonE    latS    latN
-masks = [[  "Arctic",           [-180.0,    180.0,  0.0,    90.0]], \
-         [  "Antarctic",        [-180.0,    180.0,  -90.0,  90.0]], \
-        ]
+# The ensemble members to be selected [list of strings]
+members = [str(j) for j in np.arange(50 + 1)]
+nb = len(members)
 
-nDiags = 2 # Sea ice extent and sea ice area, others can be added depending on how many diagnostics are calculated in the loop below (if so, update this integer)
-nMasks = len(masks)
-nMonthsInit = len(monthsInit)
-nYearsInit = len(yearsInit)
-nMembers = len(members)
-nTime = 7 # The lead time (in months)
+
+
+
+
 
 # We start looping over months of initialization
-# We set a boolean variable to "True" to create grid cell areas
+# We set a boolean variable to "True" to create grid cell areas only once
+
 createCellArea = True
 createMasks    = True
 createData     = True
+
+
+# Our goal here is to create an array called "forecasts" that has the following dimensions:
+
+# 1st dimension: the *d*iagnostic
+# 2nd dimension: the *r*egion
+# 3rd dimension: the *m*onth of initialization
+# 4th dimension: the *y*ear of initialization
+# 5th dimension: the mem*b*er
+# 6th dimension: the *l*ead time
+
+# Each dimension has a running index called j${letter} where $letter is d, r, m, y, b, l following the dimensions above
+
+for jd in range(nd)
 
 for jmI, monthInit in enumerate(monthsInit):
     # Then we loop over the years of initialization for a given month of initializatio
