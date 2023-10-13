@@ -48,20 +48,20 @@ if createData:
     nr = len(regions)
     
     # 3. Months of initialization [list of strings]
-    monthsInit = [5]#[2, 5, 8, 11] #! NON-Pythonic: 1 = January.
+    monthsInit = [8]#[2, 5, 8, 11] #! NON-Pythonic: 1 = January.
     nm = len(monthsInit)
     
     # 4. Years of initialization [list of strings]
-    yearsInit = np.arange(2000, 2010 + 1)
+    yearsInit = np.arange(1993, 2022 + 1)
     #yearsInit = np.arange(1993, 1995 + 1)
     ny = len(yearsInit)
     
     # 5. The ensemble members to be selected [list of strings]
-    members = [str(j) for j in np.arange(10 + 1)]
+    members = [str(j) for j in np.arange(50 + 1)]
     nb = len(members)
     
     # 6. The lead times (in months from initialization)
-    leadTimes = [4]#[0, 1, 2, 3, 4, 5, 6]
+    leadTimes = [1]#[0, 1, 2, 3, 4, 5, 6]
     nl = len(leadTimes)
     
     
@@ -91,7 +91,7 @@ if createData:
                 fileIn = dataRootDir + fileName
     
                 try:
-                    print("Reading file " + fileIn)
+                    #print("Reading file " + fileIn)
                     f = Dataset(fileIn, mode = "r")
                     sic = f.variables["sic"][:] * 100.0 # Convert to %
                     lat = f.variables["latitude"][:]
@@ -221,11 +221,21 @@ else: # If we don't create data, we read it from saved_data.pkl
 
 
 
+# Load observations (currently done very sloppy)
+print("WARNING WARNING WARNING: OBS SLOPPY")
+f = Dataset("siextentn_r1i1p1_mon_197801-202312.nc", mode= "r")
+obs = f.variables["siextentn"][(yearsInit[0]- 1978) * 12 + 8:(yearsInit[-1] - 1978) * 12 + 12: 12]
+f.close()
+
 
 # Make statistics
 # This array has dimensions nd, nr, nm, ny, nl
 forecastDataEnsembleMean = np.mean(forecastData, axis = 4)
 
+# Compute temporal standard deviation of ensemble mean
+sigEnsembleMean = np.std(forecastDataEnsembleMean, axis = 3)
+sigEnsembleMembers = np.mean(np.std(forecastData, axis = 4), axis = 3)
+sigObs = np.std(obs)
 # Make figures to check that everything. One figure per region, per lead time, per initialization month, and per diagnostic
 
 for jr in range(nr):
@@ -233,7 +243,7 @@ for jr in range(nr):
     for jm in range(nm):
         for jd in range(nd):
             for jl in range(nl):
-                fig, ax = plt.subplots(1, 1, figsize = (6, 3))
+                fig, ax = plt.subplots(1, 1, figsize = (8, 5))
                 labelFlag = True
                 for jb in range(nb):
                     if labelFlag:
@@ -241,17 +251,25 @@ for jr in range(nr):
                         labelFlag = False
                     else:
                         label = None
-                    ax.scatter(yearsInit, forecastData[jd, jr, jm, :, jb, jl], 5, color  = [0.3, 0.3, 0.3], label = label)
+                    ax.scatter(yearsInit, forecastData[jd, jr, jm, :, jb, jl], 1, color  = [0.3, 0.3, 0.3], label = label)
                 # Ensemble mean
-                ax.scatter(yearsInit + 0.1, forecastDataEnsembleMean[jd, jr, jm, :, jl], 30, color = [1, 0.5, 0], label = "Ensemble mean")
+                ax.scatter(yearsInit + 0.2, forecastDataEnsembleMean[jd, jr, jm, :, jl], 30, color = [1, 0.5, 0], label = "Ensemble mean")
+
+
+                # Plots obs
+                ax.scatter(yearsInit + 0.4, obs, 30, color = [0.0, 0.5, 0.0], marker  = "x", lw = 2, label = "OBS")
                 ax.grid()
                 ax.legend()
                 ax.set_ylabel(unitsDiagnostics[jd])
                 ax.set_axisbelow(True)
-                ax.set_title(regions[jr][0] + " sea ice " + diagnostics[jd] + "\n" + "seas 5 - " + monthsNames[monthsInit[jm] - 1] + " initialization - " + monthsNames[(monthsInit[jm] + leadTimes[jl]) % 12 - 1] + " target") 
-                figName = "seas5_" + str(yearsInit[0]) + "-" + str(yearsInit[-1]) + "_" + diagnostics[jd] + "_m" + str(monthsInit[jm]).zfill(2) + "_t" + str((monthsInit[jm] + leadTimes[jl])).zfill(2) + "_" + regions[jr][0] + ".png"
+                ax.set_title(regions[jr][0] + " sea ice " + diagnostics[jd] + "\n" + "seas 5 - " + monthsNames[monthsInit[jm] - 1] + " initialization - " + monthsNames[(monthsInit[jm] + leadTimes[jl]) % 12 - 1] + " target" + \
+                        "\n$\sigma_{EnsMean}$ = " + str(np.round(sigEnsembleMean[jd, jr, jm, jl], 2)) + " " + unitsDiagnostics[jd]  +  \
+                        "\n$\sigma_{tot}$ = " + str(np.round(sigEnsembleMembers[jd, jr, jm, jl], 2))  + " " + unitsDiagnostics[jd]  +  \
+                        "\n$\sigma_{obs}$ = " + str(np.round(sigObs, 2))  + " " + unitsDiagnostics[jd]   + \
+                        "\n r(obs, EnsMean) = " + str(np.round(np.corrcoef(obs, forecastDataEnsembleMean[jd, jr, jm, :, jl])[0, 1], 2)))
+                figName = "seas5_" + str(yearsInit[0]) + "-" + str(yearsInit[-1]) + "_" + diagnostics[jd] + "_m" + str(monthsInit[jm]).zfill(2) + "_l" + str(leadTimes[jl]).zfill(2) + "_" + regions[jr][0] + ".png"
                 fig.tight_layout()
-                plt.savefig("./figs/" + figName)
+                plt.savefig("./figs/" + figName, dpi = 300)
                 print(figName + "  printed")
                 plt.close(fig)
 
