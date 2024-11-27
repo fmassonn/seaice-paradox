@@ -234,7 +234,8 @@ forecastDataEnsembleMean = np.mean(forecastData, axis = 4)
 
 # Compute temporal standard deviation of ensemble mean
 sigEnsembleMean = np.std(forecastDataEnsembleMean, axis = 3)
-sigEnsembleMembers = np.mean(np.std(forecastData, axis = 4), axis = 3)
+# Compute sig2_tot as in Eade et al: time average of per-year ensemble variance
+sigEnsembleMembers = np.sqrt(np.mean(np.var(forecastData, axis = 4), axis = 3))
 sigObs = np.std(obs)
 # Make figures to check that everything. One figure per region, per lead time, per initialization month, and per diagnostic
 
@@ -263,10 +264,10 @@ for jr in range(nr):
                 ax.set_ylabel(unitsDiagnostics[jd])
                 ax.set_axisbelow(True)
                 ax.set_title(regions[jr][0] + " sea ice " + diagnostics[jd] + "\n" + "seas 5 - " + monthsNames[monthsInit[jm] - 1] + " initialization - " + monthsNames[(monthsInit[jm] + leadTimes[jl]) % 12 - 1] + " target" + \
-                        "\n$\sigma_{EnsMean}$ = " + str(np.round(sigEnsembleMean[jd, jr, jm, jl], 2)) + " " + unitsDiagnostics[jd]  +  \
-                        "\n$\sigma_{tot}$ = " + str(np.round(sigEnsembleMembers[jd, jr, jm, jl], 2))  + " " + unitsDiagnostics[jd]  +  \
-                        "\n$\sigma_{obs}$ = " + str(np.round(sigObs, 2))  + " " + unitsDiagnostics[jd]   + \
-                        "\n r(obs, EnsMean) = " + str(np.round(np.corrcoef(obs, forecastDataEnsembleMean[jd, jr, jm, :, jl])[0, 1], 2)))
+                        "\n$(\sigma_{sig})^2$ = " + "(" + str(np.round(sigEnsembleMean[jd, jr, jm, jl], 2)) + " " + unitsDiagnostics[jd] + ")$^2$"  +  \
+                        "\n$(\sigma_{tot})^2$ = " + "(" + str(np.round(sigEnsembleMembers[jd, jr, jm, jl], 2))  + " " + unitsDiagnostics[jd]  + ")$^2$"  \
+                        "\n$(\sigma_{obs})^2$ = " + "(" + str(np.round(sigObs, 2))  + " " + unitsDiagnostics[jd]   + ")$^2$" \
+                        "\n r(obs, EnsMean) = PC_obs =" + str(np.round(np.corrcoef(obs, forecastDataEnsembleMean[jd, jr, jm, :, jl])[0, 1], 2)))
                 figName = "seas5_" + str(yearsInit[0]) + "-" + str(yearsInit[-1]) + "_" + diagnostics[jd] + "_m" + str(monthsInit[jm]).zfill(2) + "_l" + str(leadTimes[jl]).zfill(2) + "_" + regions[jr][0] + ".png"
                 fig.tight_layout()
                 plt.savefig("./figs/" + figName, dpi = 300)
