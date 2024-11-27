@@ -61,7 +61,7 @@ if createData:
     nb = len(members)
     
     # 6. The lead times (in months from initialization)
-    leadTimes = [1]#[0, 1, 2, 3, 4, 5, 6]
+    leadTimes = [0, 1, 2, 3, 4, 5, 6]
     nl = len(leadTimes)
     
     
