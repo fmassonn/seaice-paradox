@@ -25,7 +25,7 @@ monthsNames = ["January", "February", "March", "April", "May", "June", "July", "
 
 
 # A switch to decide whether we re-compute the data or if we load them from a pkl file
-createData = False
+createData = True
 
 if createData:
 
@@ -43,12 +43,12 @@ if createData:
     # 2. Definition of regions [list of lists each containing a name, and a list of coordinates defining the boundaries]
                   # Name              lonW        lonE    latS    latN
     regions = [[  "Arctic",           [-180.0,    180.0,  0.0,    90.0]], \
-    #           [  "Antarctic",        [-180.0,    180.0,  -90.0,  90.0]], \
+               [  "Antarctic",        [-180.0,    180.0,  -90.0,  90.0]], \
               ]
     nr = len(regions)
     
     # 3. Months of initialization [list of strings]
-    monthsInit = [8]#[2, 5, 8, 11] #! NON-Pythonic: 1 = January.
+    monthsInit = [2, 5, 8, 11] #! NON-Pythonic: 1 = January.
     nm = len(monthsInit)
     
     # 4. Years of initialization [list of strings]
